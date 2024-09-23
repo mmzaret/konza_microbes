@@ -177,7 +177,9 @@ year_treat_plot2 <- year_treat_plot +
 year_treat_plot2
 
 #Effect sizes####
-#differences among treatments or years (euclidean distance among treatment centroids)
+#Calculating variation in effect sizes of bison and fire treatments on microbial composition
+#do this by measuring euclidean distance between centroids (treatments) for each year
+
 #grazing differences
 year.graze.centroids <- pcoa %>%
   group_by(Year, Graze) %>%
@@ -316,17 +318,13 @@ burnplot <- ggplot(burn_effects_df, aes(x=year, y=burn_effects)) +
   labs(y="Burning effect", x="Year") +
   theme_bw() 
 burnplot
+
+#combine the bison and fire effect size plots
 effectsplot <- grazeplot + burnplot
 effectsplot
 
 trt_effects_df <- merge(graze_effects_df, burn_effects_df, by="year")
 
-cor.test((trt_effects_df$graze_effects), (trt_effects_df$burn_effects))
-ggplot(trt_effects_df, aes(burn_effects, graze_effects)) +
-  geom_point() +
-  geom_smooth(method="lm")
-
-#bring in GWC?
 #bring in climate for comparison #need climate code for this
 trt_effects_df
 climate
