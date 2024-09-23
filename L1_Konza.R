@@ -1184,10 +1184,6 @@ lsmeans(lme(fixed = PD ~ Graze * Burn * Year,
             data=alphadiv),
         pairwise ~ Graze * Burn|Year, type="Tukey")
 
-#in 2023:
-1-(309/288)
-#12% reduction in phylogenetic diveristy
-
 #visualize alpha diversity
 richnessplot <- alphadiv %>%
   ggplot(., aes(Treatment, Observed, color=Treatment)) +
@@ -1236,19 +1232,7 @@ alphadiv %>%
   coord_cartesian(ylim=c(2750,4500)) +
   theme(legend.position = "none")
 
-alphadiv %>%
-  filter(Year == 2022) %>%
-  ggplot(., aes(Treatment, Observed, color=Treatment)) +
-  scale_color_manual(values=cbPalette) +
-  geom_jitter(alpha=0.2) +
-  stat_summary(fun.data="mean_cl_boot", size=1) +
-  theme_bw() +
-  labs(y="Microbial Richness (ASV)", x="") +
-  #theme(axis.ticks.x=element_blank(),
-  #      axis.text.x = element_blank(),
-  #      axis.title.x = element_blank()) +
-  coord_cartesian(ylim=c(2750,4500)) +
-  theme(legend.position = "none")
+
 
 
 pdplot <- alphadiv %>%
@@ -1286,26 +1270,8 @@ alphadivplot
 #merge PCOA with alpha div plot (code below)
 all_plot + alphadivplot + plot_layout(ncol=2, nrow=1, widths=c(0.9,0.6))
 
+#this is our figure 1 ^^^^^
 
-#exploring sensitivity of alpha diversity results
-alphadiv <- alphadiv %>%
-  mutate(samplelocation = as.factor(paste(Plot, Point, sep="")))
-
-lme1 <- lme(fixed = Observed ~ Graze * Burn * Year,
-              random = ~1 | Watershed/Transect/samplelocation,
-              data=alphadiv)
-
-plot(lme1)
-summary(lme1)
-anova(lme1)
-
-lme1 <- lme(fixed = PD ~ Graze * Burn * Year,
-            random = ~1 | Watershed/Transect/samplelocation,
-            data=alphadiv)
-
-plot(lme1)
-summary(lme1)
-anova(lme1)
 #Merged samples for visualizing composition averaged for treatments or years####
 #By Treatment
 mergedps = merge_samples(ps, "Treatment")
