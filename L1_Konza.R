@@ -326,16 +326,19 @@ effectsplot
 trt_effects_df <- merge(graze_effects_df, burn_effects_df, by="year")
 
 #bring in climate for comparison #need climate code for this
-trt_effects_df
-climate
+climate <- read.csv("konza_climatesummary.csv")
+
+
 trt_effects_df <- merge(trt_effects_df, climate, by="year")
 trt_effects_df
 str(trt_effects_df)
+
 #compare to precip and growing season precip
 cor.test(trt_effects_df$graze_effects, trt_effects_df$total_precip)
 cor.test(trt_effects_df$graze_effects, trt_effects_df$gs_precip)
 cor.test(trt_effects_df$burn_effects, trt_effects_df$total_precip)
 cor.test(trt_effects_df$burn_effects, trt_effects_df$gs_precip)
+#only report total precip in manuscript given no difference with growing season precipitation
 
 library(ggrepel)
 graze_precip_plot <- ggplot(trt_effects_df, aes(total_precip, graze_effects)) +
@@ -356,20 +359,12 @@ burn_precip_plot <- ggplot(trt_effects_df, aes(total_precip, burn_effects)) +
 
 grazeplot + burnplot + graze_precip_plot + burn_precip_plot
 
-#alternative
-mantel(dist(trt_effects_df$graze_effects), dist(trt_effects_df$total_precip))
-mantel(dist(trt_effects_df$graze_effects), dist(trt_effects_df$gs_precip))
-mantel(dist(trt_effects_df$burn_effects), dist(trt_effects_df$total_precip))
-mantel(dist(trt_effects_df$burn_effects), dist(trt_effects_df$gs_precip))
-
 #Distance dissimilarity####
-#show graze and burn trends - report lstrends output
-#describe interaction
-#describe crazy variation year-to-year
-#now do each treatment in a given year - 5 years x 4 treatments = 20 df we will
-#then combine to setup ancova and compare distance-dissimilarity patterns
-#change ps.hel to ps.ra for convenience later just replace ps.ra with ps.hel in code
-ps.ra <- ps.hel #just changing name of ps because I am too lazy to rename ps.ra to ps.hel over and over after originally writing this
+#For each treatment in a given year - 5 years x 4 treatments = 20 df where we will calculate community distances
+#then combine dfs to run an ancova of how community distance varies by geographic distance, bison, fire, and year of sampling
+
+ps.ra <- ps.hel #just changing name of phyloseq object because I am too lazy to rename ps.ra to ps.hel over and over after originally writing this code
+
 #UG20
 ps2016ug20 <- ps.ra %>%
   ps_filter(Treatment == "UG20" & Year == "2016") %>%
@@ -938,6 +933,7 @@ dd_df <- df_2016ug20 %>%
   rbind(df_2023ug1) %>%
   rbind(df_2023g1)
 
+#have to rename and relevel factors
 dd_df <- dd_df %>%
   mutate(Treatment = as.factor(Treatment),
          Graze = case_when(Treatment == "UG20" ~ "No Grazers",
@@ -973,32 +969,33 @@ dd_df$Burn <- relevel(dd_df$Burn, ref='Frequent Burn')
 dd_df$Burn <- relevel(dd_df$Burn, ref='Infrequent Burn')
 levels(dd_df$Burn)
 
-View(dd_df)
-#now run ancova and visualize# #transform distance or not?
-hist((dd_df$bray))
-hist((dd_df$dist))
-hist(log(dd_df$dist))
-
+#now run ancova and visualize#
+#we log transform geographic distance to match sampling scheme which was done on a log scale
 model <- (lm((bray) ~ log(dist) * Graze * Burn * Year, data=dd_df))
 summary(model)
 ancova <- anova(model)
 ancova
 
 #do distance dissimilarity slopes differ across treatments?
+#Run t tests that determine if the slope between community distance and geographic distance varies between experimental treatments
 #Bison
 m.lst <- lstrends(model, ~Graze, var="log(dist)")
 m.lst
-pairs(m.lst,)
 pairs(m.lst)
+#Higher slope with bison present
+
 #Burn
 m.lst <- lstrends(model, ~Burn, var="log(dist)")
 m.lst
 pairs(m.lst)
 
+
 #interaction
 m.lst <- lstrends(model, ~Graze & Burn, var="log(dist)")
 m.lst
 pairs(m.lst)
+#this is meaningful comparison that is accounting for both
+#use these estimates and p values for the subset inside the the DDR figure
 
 #graze and year interaction
 m.lst <- lstrends(model, ~Graze & Year, var="log(dist)")
@@ -1010,10 +1007,11 @@ m.lst <- lstrends(model, ~Burn & Year, var="log(dist)")
 m.lst
 pairs(m.lst)
 
-#burn and year interaction
+#graze and burn and year interaction
 m.lst <- lstrends(model, ~Graze & Burn & Year, var="log(dist)")
 m.lst
 pairs(m.lst)
+#this last one spits out every slope from every treatment and year if someone wants that...
 
 #visuals#
 ggplot(dd_df, aes(x=log(dist), y=(bray))) +
@@ -1075,7 +1073,7 @@ ggplot(dd_df, aes(x=log(dist), y=log(bray), color=Burn)) +
   stat_cor() +
   labs(x="Distance (meters)", y="Bray-Curtis Dissimilarity")
 
-#show slope estimes with CL and add significance groups
+#make a figure that shows slope estimates with CL and add significance groups
 #interaction
 m.lst <- lstrends(model, ~Graze & Burn, var="log(dist)")
 m.lst
@@ -1106,12 +1104,13 @@ ddslopes <- ggplot(slopes, aes(Treatment, slope)) +
   coord_cartesian(ylim=c(0.004,0.011)) +
   theme_bw()
 ddslopes
-ddplot + ddslopes
+
 ddplot + inset_element(ddslopes, 0.01,0.6,0.4,0.99, align_to = "panel")
 
 ggsave(filename="ddplot.pdf", 
        path="/Users/mzaret/Documents/Research/KSU/Project 1/analysis/figures",
        width=8, height = 6)
+
 #Alpha diversity####
 #read in rarefied asv table (rarefaction with 1000 iterations)
 ps.rare <- readRDS("konza_asv_rare7222024.ps")
