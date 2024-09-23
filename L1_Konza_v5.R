@@ -9,7 +9,6 @@ library(tidyverse)
 library(vegan)
 library(phyloseq)
 library(microViz)
-library(pairwiseAdonis)
 library(nlme)
 library(lsmeans)
 library(patchwork)
@@ -30,14 +29,13 @@ setwd("/Users/mzaret/Documents/Research/KSU/Project 1/analysis") #change to your
 ps <- readRDS("cleaned_konza.ps") #files can be found on github
 
 ps
-
 levels(sample_data(ps)$Burn)
 levels(sample_data(ps)$Graze)
 levels(sample_data(ps)$Treatment)
 
 #Look at sampling across years#
 sample_data(ps) %>%
-  #group_by(Treatment) %>%
+  group_by(Treatment) %>%
   dplyr::count()
 
 #Look at sampling across years#
@@ -48,9 +46,10 @@ sample_data(ps) %>%
 #taxa table sorted by abundance#
 View(tax_table(tax_sort(ps, by=mean)))
 
+#pull out otu table in order to do normalizing transformation for compositional analyses
 tab <- otu_table(ps)
 class(tab) <- "matrix" # as.matrix() will do nothing
-## you get a warning here, but this is what we need to have
+## you get a warning here but its nothing to worry about
 
 #total number of sequences
 sum(tab)
@@ -67,12 +66,7 @@ permanova <- adonis2(bray_dist ~ sample_data(ps.hel)$Graze * sample_data(ps.hel)
                      permutations = how(blocks=sample_data(ps.hel)$Plot, nperm=999))
 permanova
 
-pairwise.adonis(bray_dist, sample_data(ps)$Graze) #don't think we report pairwise comparisons but keep for now
-pairwise.adonis(bray_dist, sample_data(ps)$Burn)
-pairwise.adonis(bray_dist, sample_data(ps)$Treatment)
-pairwise.adonis(bray_dist, sample_data(ps)$Year)
-
-#dispersion#
+#dispersion# # we don't report this in the manuscript#
 #grazing effect on dispersion
 mod <- betadisper(bray_dist, sample_data(ps)$Graze)
 permutest(mod)
@@ -94,6 +88,8 @@ plot(mod.HSD)
 #Ordination####
 #PCoA#####
 ordination <- ordinate(ps.hel, method = "PCoA", distance = bray_dist)
+ordination #9.1% and 7.7% variance explained by first two axes of PCOA
+
 str(ordination$vectors)
 ordination$values
 scores <- as.data.frame(ordination$vectors)
@@ -128,7 +124,6 @@ year.treat.centroids <- pcoa %>%
 ordination$values$Eigenvalues
 evals <- ordination$values$Eigenvalues #for normalizing plot axis rations to the relevant eigenvalue ratios
 
-#have to use plot_ordination to see percents on axes then we add on our own with ggplot for more customization
 all_plot <- ggplot(pcoa, aes(Axis.1, Axis.2, color=Treatment)) +
   geom_point(alpha=0.3) +
   #stat_ellipse(type="t") +
@@ -137,7 +132,7 @@ all_plot <- ggplot(pcoa, aes(Axis.1, Axis.2, color=Treatment)) +
   coord_fixed(sqrt(evals[2] / evals[1])) +
   theme_bw()
 
- all_plot
+all_plot
 
 all_plot <- all_plot + 
   geom_point(data=treat.centroids, aes(meanAxis1, meanAxis2, color=Treatment), size=7, shape=18) +
@@ -180,12 +175,6 @@ year_treat_plot2 <- year_treat_plot +
   theme(legend.position = c(0.75,0.3))
 
 year_treat_plot2
-
-#looking at watersheds
-pcoa %>%
-  filter(Year == "2023") %>%
-  ggplot(., aes(Axis.1, Axis.2, color=Watershed, shape=Treatment)) +
-  geom_point()
 
 #Effect sizes####
 #differences among treatments or years (euclidean distance among treatment centroids)
