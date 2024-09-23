@@ -1887,25 +1887,19 @@ fig3 <- p + envplot
 fig3
 
 #differential abundance####
+#look at what specific taxa are responding to treatments at ASV and phylum level
+#i toggled this code back and forth between using ASV (ps) object or phylum aggregated tables (ps.phylum below)
 library(DESeq2)
 
 #combine asvs into phylum level
 ps.phylum <- tax_glom(ps, taxrank="Phylum")
 ps.phylum
 
-ps.family <- tax_glom(ps, taxrank = "Family")
-ps.family
-
-ps.genus <- tax_glom(ps, taxrank="Genus")
-ps.genus
-
-ps.species <- tax_glom(ps, taxrank="Species")
-ps.species
 #sort tax table by abundance
 View(tax_table(tax_sort(ps.phylum, by=mean)))
 
 #grazing impact
-ds <- phyloseq_to_deseq2(ps, ~Graze)
+ds <- phyloseq_to_deseq2(ps, ~Graze) #toggle this with ps.phylum depending on focus
 ds <- DESeq(ds)
 
 alpha=0.001
@@ -1932,11 +1926,9 @@ grazing_asv_distribution <- ggplot(results, aes(log2FoldChange, fill=Phylum)) +
   scale_y_continuous(expand = c(0,0), limits=c(0,210), breaks=c(0,50,100,150,200))
 grazing_asv_distribution       
 
-(2^0.25 - 1) * 100
-(2^1.382 - 1) * 100
-
 res_sig = cbind(as(res_sig, "data.frame"), as(tax_table(ps)[rownames(res_sig), ], "matrix"))
 
+#rerun deseq analysis with ps phylum for these results
 results <- results %>%
   arrange(log2FoldChange) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
   mutate(Phylum=factor(Phylum, levels=Phylum))   # This trick update the factor levels
@@ -1957,7 +1949,8 @@ gdplot
 (2^1.36532824 - 1) * 100
 #Firmicutes
 (2^0.87862550 - 1) * 100
-#burn impact
+
+#fire treatment analysis now
 ds <- phyloseq_to_deseq2(ps, ~Burn)
 ds <- DESeq(ds)
 
@@ -2009,314 +2002,3 @@ gdplot + fdplot
 
 grazing_asv_distribution + labs(title="Grazing effect") + burn_asv_distribution +
   labs(title="Burn Effect")
-
-#burning
-res <- results(ds, alpha=alpha, contrast=c("Treatment", "UG1", "UG20"))
-res = res[order(res$padj, na.last=NA), ]
-res_sig = res[(res$padj < alpha), ]
-View(as.data.frame(res_sig))
-
-res_sig = cbind(as(res_sig, "data.frame"), as(tax_table(ps)[rownames(res_sig), ], "matrix"))
-
-burndplot <- ggplot(res_sig, aes(x=Phylum, y=log2FoldChange)) +
-  geom_jitter(size=3, width = 0.05) +
-  geom_hline(yintercept=0, lty=2) +
-  scale_y_continuous(limits=c(-2.5,2.5)) +
-  ggtitle("Burning effect") +
-  theme(axis.title.x = element_blank())
-
-burndplot
-
-#combination#
-res <- results(ds, alpha=alpha, contrast=c("Treatment", "G1", "UG20"))
-res = res[order(res$padj, na.last=NA), ]
-res_sig = res[(res$padj < alpha), ]
-res_sig
-
-res_sig = cbind(as(res_sig, "data.frame"), as(tax_table(ps)[rownames(res_sig), ], "matrix"))
-
-gbdplot <- ggplot(res_sig, aes(x=Phylum, y=log2FoldChange)) +
-  geom_jitter(size=3, width = 0.05) +
-  geom_hline(yintercept=0, lty=2) +
-  scale_y_continuous(limits=c(-2.5,2.5)) +
-  ggtitle("Grazing and Frequent Fire") +
-  theme(axis.title.x = element_blank())
-
-gbdplot
-
-#compare grazing with and without fire
-res <- results(ds, alpha=alpha, contrast=c("Treatment", "G1", "G20"))
-res = res[order(res$padj, na.last=NA), ]
-res_sig = res[(res$padj < alpha), ]
-res_sig
-
-gdplot + gbdplot
-
-# Define the taxa you want like this:
-#ASV16 Crenarchaeota
-#ASV 37 firmicutes
-#make df that has these threshold taxa to then look at their correlation in abundances..
-goodTaxa = c("ASV_16")
-goodTaxa = c("Crenarchaeota", "Methylomirabilota", "Firmicutes", "Actinobacteriota")
-ps.phylum <- tax_glom(ps, taxrank="Phylum")
-taxa_names(ps.phylum) <- tax_table(ps.phylum)[,2] #rename asvs with phylum name
-ps.ra <- transform_sample_counts(ps.phylum, function(x) x / sum(x))
-allTaxa = taxa_names(ps.ra)
-allTaxa
-allTaxa <- allTaxa[(allTaxa %in% goodTaxa)]
-allTaxa
-ex1 = prune_taxa(allTaxa, ps.ra)
-# new phyloseq object with just the taxa you kept.
-ex1
-
-ex1 <- as.data.frame(as.matrix(otu_table(ex1)))
-
-ex1 <- merge(ex1, sample_data(ps.ra), by="row.names")
-ex1 %>%
-  group_by(Graze) %>%
-  summarize(mean_cren=mean(ASV_16))
-summary(ex1)
-crenplot <- ggplot(ex1, aes(Treatment, Crenarchaeota, color=Treatment)) +
-  geom_jitter(alpha=0.2) +
-  stat_summary(fun.data="mean_cl_boot", size=1) +
-  scale_color_manual(values=cbPalette) +
-  labs(y="Crenarchaeota (Relative Abundance)", x="") +
-  theme_bw() +
-  theme(legend.position="none") +
-  coord_cartesian(ylim=c(0,0.03))
-
-crenplot
-
-ggsave(filename="archaeaplot.pdf", 
-       path="/Users/mzaret/Documents/Research/KSU/Project 1/analysis/figures",
-       width=6, height = 6)
-
-all_plot + crenplot + plot_layout(guides="collect")
-  
-
-
-ggplot(ex1, aes(Treatment, Firmicutes, color=Treatment)) +
-  geom_jitter(alpha=0.2) +
-  stat_summary(size=0.3) +
-  scale_color_brewer(palette="Dark2") +
-  labs(y="Firmicutes") +
-  facet_wrap(~Year)
-
-ggplot(ex1, aes(Treatment, ASV_4, color=Treatment)) +
-  geom_jitter(alpha=0.2) +
-  stat_summary(size=0.3) +
-  scale_color_brewer(palette="Dark2") +
-  labs(y="ASV_4")
-
-
-hist(log(ex1$ASV_16))
-#this doesnt work at all for what we want. but keep code for isolating asvs
-
-#look at whole dataset?# no too many, consider certain phylum?
-psb <- ps %>%
-  subset_taxa(., Phylum == "Proteobacteria")
-psb
-
-ds <- phyloseq_to_deseq2(psb, ~Treatment)
-ds <- DESeq(ds)
-
-#grazing impact
-res <- results(ds, alpha=alpha, contrast=c("Treatment", "G1", "UG20"))
-res = res[order(res$padj, na.last=NA), ]
-res_sig = res[(res$padj < alpha), ]
-res_sig
-
-res_sig = cbind(as(res_sig, "data.frame"), as(tax_table(ps)[rownames(res_sig), ], "matrix"))
-
-gdplot <- ggplot(res_sig, aes(x=Phylum, y=log2FoldChange)) +
-  geom_jitter(size=3, width = 0.05) +
-  geom_hline(yintercept=0, lty=2) +
-  scale_y_continuous(limits=c(-2.5,2.5)) +
-  ggtitle("Grazing effect") +
-  theme(axis.title.x = element_blank())
-
-gdplot
-
-
-#plant comparison####
-#by transect to compare to plant data which is transect level?
-#subset ps by each year then do this.. then can recombine??
-levels(sample_data(ps)$Plot)
-mergedps2016 = ps %>%
-  ps_filter(Year == 2016) %>%
-  merge_samples(., "Plot")
-mergedps
-(sample_data(mergedps))
-#that does work but can we combine later? probably can once we calculate distances...
-bray_2016 <- phyloseq::distance(mergedps2016, method="bray")
-
-microdist2016 <- as.data.frame.table(as.matrix(bray_2016)) %>%
-  transform(Var1 = as.character(Var1), Var2 = as.character(Var2)) %>%
-  subset(Var1<Var2) %>%
-  mutate(Year = 2016)
-
-#ok! This works - i would just add a 2016 tag to var1 and var 2 so we can rbind multiple years..
-
-mergedps2018 = ps %>%
-  ps_filter(Year == 2018) %>%
-  merge_samples(., "Plot")
-
-#merge microbes and plants
-compare <- merge(microdist2016, plantsdist2016, by=c("Var1", "Var2"))
-compare <- compare %>%
-  mutate(BCMicro = Freq.x,
-         BCPlant = Freq.y)
-
-cor.test(compare$BCMicro, compare$BCPlant)
-
-ggplot(compare, aes(BCMicro, BCPlant)) +
-  geom_point() + geom_smooth(method="lm")
-
-#soooo look at this by treatment? or by year?
-
-
-#look at soil factor averages compared to annual climate#####
-library(corrplot)
-env_averages <- df %>%
-  group_by(Year) %>%
-  summarize(pH = mean(pH),
-            C_N = mean(C_N),
-            GWC = mean(GWC),
-            C = mean(C),
-            N = mean(N))
-
-compare <- env_averages %>%
-  mutate(year = Year) %>%
-  inner_join(., climate, by="year") %>%
-  select(-Year, -year)
-
-df %>%
-  mutate(year = Year) %>%
-  inner_join(., climate, by="year") %>%
-  ggplot(., aes(gs_precip, RDA1)) +
-  geom_jitter() +
-  geom_smooth(method="lm") +
-  stat_cor()
-
-###BNTI?####
-library(iCAMP)
-library(ape)
-
-#top 1000 taxa
-ps.10000 <- prune_taxa(names(sort(taxa_sums(ps),TRUE)[1:10000]), ps)
-
-#now subset by grazed versus ungrazed or fire versus no fire or by all 4 treatments? Then calculate BNTI distributions and compare
-
-ps.graze <- ps.10000 %>%
-  ps_filter(Burn == "Frequent Burn")
-ps.ungrazed <- ps.10000 %>%
-  ps_filter(Burn == "Infrequent Burn")
-#grazed#
-comm = as.matrix(as.data.frame(as.matrix(otu_table(ps.graze))))
-pd <- cophenetic.phylo(phy_tree(ps.graze))
-
-grazebnti <- bNTIn.p(comm, pd, nworker = 4, memo.size.GB = 10,
-             weighted = TRUE, exclude.consp = FALSE,
-             rand = 100, output.bMNTD = FALSE, 
-             sig.index=c("SES"),
-             unit.sum = NULL, correct.special = TRUE,
-             detail.null=FALSE,
-             special.method=c("MNTD"))
-
-grazebnti <- data.frame(as.vector(grazebnti$index)) %>%
-  mutate(BNTI = as.vector.grazebnti.index.) %>%
-  mutate(Treatment = "Bison Present") %>%
-  select(-as.vector.grazebnti.index.)
-
-#now do ungrazed
-comm = as.matrix(as.data.frame(as.matrix(otu_table(ps.ungrazed))))
-pd <- cophenetic.phylo(phy_tree(ps.ungrazed))
-
-ungrazebnti <- bNTIn.p(comm, pd, nworker = 4, memo.size.GB = 10,
-                     weighted = TRUE, exclude.consp = FALSE,
-                     rand = 100, output.bMNTD = FALSE, 
-                     sig.index=c("SES"),
-                     unit.sum = NULL, correct.special = TRUE,
-                     detail.null=FALSE,
-                     special.method=c("MNTD"))
-
-ungrazebnti <- data.frame(as.vector(ungrazebnti$index)) %>%
-  mutate(BNTI = as.vector.ungrazebnti.index.) %>%
-  mutate(Treatment = "No Grazers") %>%
-  select(-as.vector.ungrazebnti.index.)
-
-#combine
-BNTI <- grazebnti %>%
-  rbind(ungrazebnti)
-str(BNTI)
-
-BNTI <- BNTI %>%
-  mutate(Treatment = as.factor(Treatment))
-
-ggplot(BNTI, aes(x=BNTI, fill=Treatment)) + 
-  geom_histogram() +
-  scale_x_continuous(limits=c(-2,2))
-  geom_vline(xintercept=0.4484548, lty=2, color="red") +
-  geom_vline(xintercept=0.3513737, lty=2, color="blue")
-  
-
-ggplot(BNTI, aes(x=Treatment, y=BNTI)) +
-  geom_boxplot() +
-  scale_y_continuous(limits=c(-25,20))
-
-BNTI %>%
-  filter(Treatment == "Bison Present") %>%
-  summarize(meanBNTI = mean(BNTI))
-
-BNTI %>%
-  filter(Treatment == "No Grazers") %>%
-  summarize(meanBNTI = mean(BNTI))
-
-summary(lm(BNTI ~ Treatment, data=BNTI))
-#example#
-data("example.data")
-comm=example.data$comm
-pd=example.data$pd
-nworker=2 # parallel computing thread number
-rand.time=4 # usually use 1000 for real data.
-bNTI=bNTIn.p(comm=comm, dis=pd, nworker = nworker, memo.size.GB = 50,
-             weighted = TRUE, exclude.consp = FALSE, rand = rand.time,
-             output.bMNTD = FALSE, sig.index = "SES", unit.sum = NULL,
-             correct.special = TRUE, detail.null = FALSE,
-             special.method = "MNTD")
-pd
-
-#Actinos####
-ex1 <- ex1 %>%
-  mutate(C = as.numeric(C),
-         N = as.numeric(N),
-         pH = as.numeric(pH),
-         GWC = as.numeric(GWC),
-         Year = as.factor(Year),
-         Treatment = as.factor(Treatment),
-         Graze = as.factor(Graze),
-         Burn = as.factor(Burn),
-         Plot = as.factor(Plot)) %>%
-  mutate(C = C*0.084,
-         N = N*0.07139,
-         C_N = C/N)
-str(ex1)
-
-alphadiv
-ex1 <- merge(ex1, alphadiv, by="SampleID")
-
-ex1
-
-cor.test(ex1$C_N, ex1$Actinobacteriota)
-cor.test(ex1$Observed, ex1$Actinobacteriota)
-cor.test(ex1$PD, ex1$Actinobacteriota)
-
-ggplot(ex1, aes(C_N, Actinobacteriota)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  stat_cor()
-
-ggplot(ex1, aes(Actinobacteriota, PD)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  stat_cor()
