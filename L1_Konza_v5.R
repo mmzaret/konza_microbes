@@ -1,9 +1,7 @@
 #Analyzing soil bacterial communities from Konza Prairie
 #Study involves Bison grazing and prescribed burning
-#Version five involves removing somethings we are not using like:
-#jaccard distance, NMDS, weighted unifrac, 
-#evenness, simpson diversity, plant comparison, etc. See V4 for code example.
-#7-19-2024
+#Max Zaret, Kansas State University
+#https://github.com/mmzaret/konza_microbes.git
 
 rm(list=ls())
 
@@ -12,7 +10,6 @@ library(vegan)
 library(phyloseq)
 library(microViz)
 library(pairwiseAdonis)
-library(RColorBrewer)
 library(nlme)
 library(lsmeans)
 library(patchwork)
@@ -23,14 +20,14 @@ library(broom)
 
 standard_error <- function(x) sd(x) / sqrt(length(x))
 
-#colors#
+#colors for figures#
 cbPalette <- c("goldenrod1", "#56B4E9", "darkorange3", "#009E73")
 
 getwd()
-setwd("/Users/mzaret/Documents/Research/KSU/Project 1/analysis")
+setwd("/Users/mzaret/Documents/Research/KSU/Project 1/analysis") #change to your wd
 
 #Read in data####
-ps <- readRDS("cleaned_konza.ps")
+ps <- readRDS("cleaned_konza.ps") #files can be found on github
 
 ps
 
