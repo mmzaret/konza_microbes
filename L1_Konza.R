@@ -1326,6 +1326,7 @@ ggplot(data=data_glom, aes(x=Sample, y=100*Abundance, fill=Phylum)) +
   labs(x="Year", y="Percent Relative Abundance")
 
 #RDA####
+#Redundancy analysis
 #filter data so we only have samples where we have soilchem data
 ps2 <- ps_drop_incomplete(ps.hel)
 ps2
@@ -1334,6 +1335,7 @@ ps2 <- ps2 %>%
   ps_filter(C != ".")
 
 ps2
+
 #environmental data
 env <- as.data.frame(as.matrix(sample_data(ps2)))
 env
@@ -1363,13 +1365,13 @@ dca
 #if axis length of DCA1 is <3 RDA, if >4, CCA - between go with whatever you want
 
 
-#dimensions match due to filtering in making ps2
+#dimensions match thanks to our filtering in making ps2 object
 dim(env)
 dim(asv_hell)
 
 PC1=rda(asv_hell~., env)
 summary(PC1)
-anova.cca(PC1, permutations=300, by="term")
+#anova.cca(PC1, permutations=1000, by="term")
 
 #visualize rda
 #extract sites
@@ -1428,15 +1430,6 @@ geo
 geo <- geo[,11:12]
 geo
 
-spe.part.all <- varpart(asv_hell, env, geo)
-spe.part.all
-
-plot(spe.part.all,
-     Xnames = c("Env", "Geo"), # name the partitions
-     bg = c("seagreen3", "mediumpurple"), alpha = 80, # colour the circles
-     digits = 2, # only show 2 digits
-     cex = 1.5)
-
 #add year#
 year <- as.data.frame(as.matrix(sample_data(ps2)))
 year
@@ -1451,6 +1444,8 @@ plot(spe.part.all,
      bg = c("seagreen3", "mediumpurple", "red"), alpha = 80, # colour the circles
      digits = 2, # only show 2 digits
      cex = 1.5)
+
+#We can make a nicer one than that
 #custom vpa plot
 library(ggforce)
 
@@ -1458,19 +1453,6 @@ df.venn <- data.frame(x = c(3, 1, 2),y = c(1, 1,2.8),labels = c('Year', 'Env',"G
 p <- ggplot(df.venn, aes(x0 = x, y0 = y, r = 1.5, fill = df.venn$labels)) +geom_circle(alpha = .5, size = 2, colour = 'black',show.legend = FALSE ) +
   coord_fixed() +
   scale_fill_manual(values=c("white","purple", "black")) #annotate("text", x = df.venn$x , y = df.venn$y,label=df.venn$labels ,size = 5)
-p
-
-p <- p+
-  annotate("text", x=2, y=4.5, label="Geo", size=6) +
-  annotate("text", x=1, y=-0.75, label="Env", size=6) +
-  annotate("text", x=3, y=-0.75, label="Year", size=6) +
-  annotate("text", x=3.25, y=1, label="0.081", size=6) +
-  annotate("text", x=0.6, y=1, label="0.024", size=6) +
-  annotate("text", x=2, y=3, label="0.074", size=6) +
-  annotate("text", x = 2 , y =1,label="0.064" ,size = 4)+
-  annotate("text", x = 1.35 , y =2,label="0.023" ,size = 4)+
-  annotate("text", x = 2.7 , y =2,label="0.010" ,size = 4) +
-  theme_void()
 p
 
 p <- p+
@@ -1494,78 +1476,12 @@ envplot <- phplot + cnplot + plot_layout(ncol=1, nrow=2)
 figs14 <- p + envplot
 figs14
 
-#run RDA with treatments and year instead of environmental stuff
-trt <- as.data.frame(as.matrix(sample_data(ps2)[,c(2,4,5)])) %>%
-  mutate(Year = as.factor(Year),
-         Graze= as.factor(Graze),
-         Burn = as.factor(Burn))
-str(trt)
-PC1=rda(asv_hell~., trt)
-summary(PC1)
-anova.cca(PC1, permutations=100, by="term")
-
-graze <- trt[,c(2)]
-str(graze)
-burn <- trt[,c(3)]
-burn
-spe.part.all <- varpart(asv_hell, graze, burn, year)
-spe.part.all
-
-plot(spe.part.all,
-     Xnames = c("graze", "burn", "year"), # name the partitions
-     bg = c("seagreen3", "mediumpurple", "red"), alpha = 80, # colour the circles
-     digits = 2, # only show 2 digits
-     cex = 1.5)
 #partial mantel tests#####
+#looking at correlations between community dissimilarity and geographic distance between samples while accounting for environmental differences (RDA axes)
+#function to remove 0 values when comparing matrices
 select_all_but_diag <- function(x) matrix(x[lower.tri(x, diag = F) | upper.tri(x, diag = F)], nrow = nrow(x) - 1, ncol = ncol(x))
 
 #UG20
-ps2
-
-
-#bray curtis distance
-bray <- phyloseq::distance(ps2, method="bray")
-bray_matrix <- as.matrix(bray)
-
-bray_matrix <- select_all_but_diag(bray_matrix)
-#bray_matrix[!lower.tri(bray_matrix)] <- NA
-
-#geographic distance
-latlong <- df %>%
-  select(LatDD, LongDD) %>%
-  as.matrix(.)
-dist_matrix <- geodist(latlong, measure="cheap")
-dist_matrix <- log(dist_matrix+1)
-dist_matrix <- select_all_but_diag(dist_matrix)
-
-#RDA1 distance
-RDA1_matrix <- df %>%
-  select(RDA1) %>%
-  as.matrix(.) %>%
-  dist(., method="euclidean") %>%
-  as.matrix(.)
-RDA1_matrix <- select_all_but_diag(RDA1_matrix)
-
-
-#RDA2 distance
-RDA2_matrix <- df %>%
-  select(RDA2) %>%
-  as.matrix(.) %>%
-  dist(., method="euclidean") %>%
-  as.matrix(.)
-RDA2_matrix <- select_all_but_diag(RDA2_matrix)
-
-
-mantel(bray_matrix, dist_matrix)
-mantel.partial(bray_matrix, dist_matrix, RDA1_matrix)
-mantel.partial(bray_matrix, dist_matrix, RDA2_matrix)
-mantel(bray_matrix, RDA1_matrix)
-mantel.partial(bray_matrix, RDA1_matrix, dist_matrix)
-mantel.partial(bray_matrix, RDA2_matrix, dist_matrix)
-
-plot(RDA2_matrix, bray_matrix)
-#breakdown by treatment
-
 ug20<- ps2 %>%
   ps_filter(Treatment == "UG20")
 
@@ -1574,7 +1490,7 @@ bray <- phyloseq::distance(ug20, method="bray")
 bray_matrix <- as.matrix(bray)
 
 bray_matrix <- select_all_but_diag(bray_matrix)
-#bray_matrix[!lower.tri(bray_matrix)] <- NA
+
 
 #geographic distance
 latlong <- df %>%
@@ -1608,12 +1524,7 @@ RDA2_matrix <- select_all_but_diag(RDA2_matrix)
 mantel(bray_matrix, dist_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA1_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA2_matrix)
-mantel(bray_matrix, RDA1_matrix)
-mantel.partial(bray_matrix, RDA1_matrix, dist_matrix)
-mantel.partial(bray_matrix, RDA2_matrix, dist_matrix)
 
-plot(bray_matrix, dist_matrix)
-bray_matrix
 #UG1
 ug1<- ps2 %>%
   ps_filter(Treatment == "UG1")
@@ -1654,8 +1565,6 @@ RDA2_matrix <- select_all_but_diag(RDA2_matrix)
 mantel(bray_matrix, dist_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA1_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA2_matrix)
-mantel.partial(bray_matrix, RDA1_matrix, dist_matrix)
-mantel.partial(bray_matrix, RDA2_matrix, dist_matrix)
 
 
 #G20
@@ -1697,10 +1606,7 @@ RDA2_matrix <- select_all_but_diag(RDA2_matrix)
 mantel(bray_matrix, dist_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA1_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA2_matrix)
-mantel.partial(bray_matrix, RDA1_matrix, dist_matrix)
-mantel.partial(bray_matrix, RDA2_matrix, dist_matrix)
 
-plot(bray_matrix, RDA2_matrix)
 
 #G1
 g1<- ps2 %>%
@@ -1742,13 +1648,12 @@ RDA2_matrix <- select_all_but_diag(RDA2_matrix)
 mantel(bray_matrix, dist_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA1_matrix)
 mantel.partial(bray_matrix, dist_matrix, RDA2_matrix)
-mantel.partial(bray_matrix, RDA1_matrix, dist_matrix)
-mantel.partial(bray_matrix, RDA2_matrix, dist_matrix)
+
 
 #Soil Chemistry results####
 df <- as.data.frame(as.matrix(sample_data(ps2)))
 str(df)
-
+#have to transform and relevel variables again..same patterns that we did for the RDA
 df <- df %>%
   mutate(C = as.numeric(C),
          N = as.numeric(N),
@@ -1975,125 +1880,12 @@ ggsave(filename="phcnplot.pdf",
 
 gwcplot + cplot + nplot
 
-#core microbiome####
-ps
-prevdf = apply(X = otu_table(ps),
-               MARGIN = ifelse(taxa_are_rows(ps), yes = 1, no = 2),
-               FUN = function(x){sum(x > 0)})
+#last is to combine VPA with some of our metrics for figure 3
+envplot <- phplot + cnplot + plot_layout(ncol=1, nrow=2)
+envplot
+fig3 <- p + envplot
+fig3
 
-prevdf = data.frame(Prevalence = prevdf,
-                    TotalAbundance = taxa_sums(ps),
-                    tax_table(ps))
-core <- prevdf %>% 
-  filter(Prevalence == 1000) #ASVs that appear in all 402 samples
-core
-keepTaxa = rownames(core)
-ps.core = prune_taxa(keepTaxa, ps)
-ps.core
-
-ps.ra <-transform_sample_counts(ps.core, function(x) x / sum(x))
-
-#Calculate Bray-Curtis Distance among samples
-bray_dist <- phyloseq::distance(ps.ra, method="bray")
-
-permanova <- adonis2(bray_dist ~ sample_data(ps.ra)$Graze * sample_data(ps.ra)$Burn * sample_data(ps.ra)$Year, 
-                     permutations = how(blocks=sample_data(ps.ra)$Plot, nperm=999))
-permanova
-
-#NMDS first but if stress is too high maybe consider pcoa
-set.seed(1)
-ordination <- metaMDS(bray_dist, k=2)
-ordination$stress
-gof = goodness(object = ordination)
-plot(ordination, display="sites")
-points(ordination, display = "sites",
-       cex = 2*gof/mean(gof))
-
-stressplot(object = ordination, lwd = 5)
-#looks like nmds is a good choice - k=2 versus k=3 does not look dramatically different..
-scores(ordination)
-nmds <- scores(ordination) %>%
-  as.data.frame() %>%
-  merge(., sample_data(ps.ra), by='row.names')
-
-#calculate centroids and standard error around those estimates#
-#for treatments
-treat.centroids <- nmds %>%
-  group_by(Treatment) %>%
-  summarize(meanAxis1 = mean(NMDS1),
-            meanAxis2 = mean(NMDS2))
-
-year.treat.centroids <- nmds %>%
-  group_by(Year, Treatment) %>%
-  summarize(meanAxis1 = mean(NMDS1),
-            meanAxis2 = mean(NMDS2))
-
-year.centroids <- nmds %>%
-  group_by(Year) %>%
-  summarize(meanAxis1 = mean(NMDS1),
-            meanAxis2 = mean(NMDS2))
-
-#visualize ordination
-treatment_plot <- ggplot(nmds, aes(NMDS1, NMDS2, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=treat.centroids, aes(meanAxis1, meanAxis2, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2")
-
-treatment_plot
-
-treatment_plot <- ggplot(nmds, aes(NMDS1, NMDS3, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=treat.centroids, aes(meanAxis1, meanAxis3, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2")
-
-treatment_plot
-
-treatment_plot <- ggplot(nmds, aes(NMDS2, NMDS3, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=treat.centroids, aes(meanAxis2, meanAxis3, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2")
-
-treatment_plot
-
-year_treatment_plot <- ggplot(nmds, aes(NMDS1, NMDS2, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=year.treat.centroids, aes(meanAxis1, meanAxis2, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap(~Year, scales="free_y")
-
-year_treatment_plot
-
-year_treatment_plot <- ggplot(nmds, aes(NMDS1, NMDS3, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=year.treat.centroids, aes(meanAxis1, meanAxis3, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap(~Year, scales="free_y")
-
-year_treatment_plot
-
-year_treatment_plot <- ggplot(nmds, aes(NMDS2, NMDS3, color=Treatment)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=year.treat.centroids, aes(meanAxis2, meanAxis3, color=Treatment),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap(~Year, scales="free_y")
-
-year_treatment_plot
-
-year_plot <- ggplot(nmds, aes(NMDS1, NMDS2, color=Year)) +
-  geom_point(alpha=0.25) +
-  geom_point(data=year.centroids, aes(meanAxis1, meanAxis2, color=Year),size=5, shape=18) +
-  scale_color_brewer(palette = "Dark2")
-
-year_plot
-#tree of core microbiome#
-ps.core <- ps.core %>%
-  ps_mutate(Merge = "Single")
-
-mergedps = merge_samples(ps.core, "Merge")
-mergedps
-plot_tree(mergedps, ladderize=TRUE, label.tips="taxa_names", plot.margin=0.000000001, color="Phylum") +
-  guides(color=guide_legend(ncol=2)) +
-  theme(legend.position=c(0.8,0.6))
 #differential abundance####
 library(DESeq2)
 
